@@ -1,0 +1,16 @@
+services:
+  verifier-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # no-cache equivalent:
+      args:
+        BUILDKIT_INLINE_CACHE: "0"
+    image: verifier-ui
+    container_name: verifier-app
+    ports:
+      - "4300:4300"
+    environment:
+      HOST_API: "http://localhost:4300"
+    env_file:
+      - .env

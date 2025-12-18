@@ -13,6 +13,7 @@ import {
   MsoMdocAttestation,
   SdJwtVcAttestation,
 } from '../models/attestation/Attestations';
+import { environment } from '@environments/environment';
 
 @Injectable({
   providedIn: 'root',
@@ -44,6 +45,7 @@ export class DCQLService {
       nonce: uuidv4(),
       request_uri_method: selectedRequestUriMethod,
       issuer_chain: issuerChain,
+      jar_mode: environment.jar_mode as string,
     };
   }
 

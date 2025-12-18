@@ -26,9 +26,9 @@ export const WalletRedirectResolver: ResolveFn<ConcludedTransaction> =
     function concludeTransaction(walletResponse: WalletResponse): ConcludedTransaction {
       let concludedTransaction: ConcludedTransaction =  {
         transactionId: activeTransaction.initialized_transaction.transaction_id,
-        presentationQuery: activeTransaction.initialization_request.dcql_query,
+        presentationQuery: activeTransaction.initialization_request_state.transactionInitializationRequest.dcql_query,
         walletResponse: walletResponse,
-        nonce: activeTransaction.initialization_request.nonce
+        nonce: activeTransaction.initialization_request_state.transactionInitializationRequest.nonce,
       }
       // Clear local storage
       services.localStorageService.remove(constants.ACTIVE_TRANSACTION);

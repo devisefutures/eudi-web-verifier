@@ -1,9 +1,10 @@
 import {Attestation, MsoMdocAttestation, SdJwtVcAttestation} from "@core/models/attestation/Attestations";
-import {EHIC_ATTESTATION, EHIC_ATTESTATION_DC4EU, MDL_ATTESTATION, PDA1_ATTESTATION, PHOTO_ID_ATTESTATION, PID_ATTESTATION, LEARNING_CREDENTIAL_ATTESTATION} from "@core/constants/attestation-definitions";
+import {EHIC_ATTESTATION, EHIC_ATTESTATION_DC4EU, MDL_ATTESTATION, PDA1_ATTESTATION, PHOTO_ID_ATTESTATION, PID_ATTESTATION, LEARNING_CREDENTIAL_ATTESTATION, SUPPORTED_ATTESTATIONS} from "@core/constants/attestation-definitions";
 import {AttestationFormat} from "@core/models/attestation/AttestationFormat";
 import {AttestationType} from "@core/models/attestation/AttestationType";
-import {DataElement} from "@core/models/attestation/AttestationDefinition";
+import {AttestationDefinition, DataElement} from "@core/models/attestation/AttestationDefinition";
 import { ClaimsQuery } from "../models/dcql/DCQL";
+import { environment } from "@environments/environment";
 
 export const SUPPORTED_FORMATS: AttestationFormat[] = [
   AttestationFormat.MSO_MDOC,
@@ -133,9 +134,69 @@ export const PID_SD_JWT_VC_ATTRIBUTE_MAP: { [id: string]: string } = {
   "portrait": "picture"
 }
 
+export function getDynamicMsoMdocAttestation(): Attestation[] {
+  const list = [];
+  for (const attestationType of environment.attestation) {
+    for (const formatDef of attestationType.format ?? []) {
+      if (formatDef.type !== 'mso_mdoc') {
+        continue;
+      }
+      const attestationDef = SUPPORTED_ATTESTATIONS[
+        attestationType.value
+      ] as AttestationDefinition;
+
+      const NEW_ATTESTATION: MsoMdocAttestation = {
+        format: AttestationFormat.MSO_MDOC,
+        attestationDef: attestationDef,
+        doctype: formatDef.doctype as string,
+        namespace: formatDef.namespace as string,
+        claimQuery: (attribute: DataElement) => {
+          return msoMdocClaimQuery(
+            formatDef.namespace as string,
+            attribute.identifier
+          );
+        },
+      };
+      list.push(NEW_ATTESTATION);
+    }
+  }
+  return list;
+}
+
+export function getDynamicSdJwtVcAttestation(): Attestation[] {
+  const list = [];
+  for (const attestationType of environment.attestation) {
+    for (const formatDef of attestationType.format ?? []) {
+      if (formatDef.type !== 'sd_jwt_vc') {
+        continue;
+      }
+      const NEW_ATTESTATION: SdJwtVcAttestation = {
+        format: AttestationFormat.SD_JWT_VC,
+        attestationDef: SUPPORTED_ATTESTATIONS[
+          attestationType.value
+        ] as AttestationDefinition,
+        vct: formatDef.vct,
+        claimQuery: (attribute: DataElement) => {
+          return {
+            path: sdJwtVcAttributeClaimQuery(
+              attribute,
+              AttestationType[
+                attestationType.key as keyof typeof AttestationType
+              ]
+            ),
+          };
+        },
+      };
+      list.push(NEW_ATTESTATION);
+    }
+  }
+
+  return list;
+}
+
 export const ATTESTATIONS_BY_FORMAT: { [id: string]: Attestation[] } = {
-  "mso_mdoc": [PID_MSO_MDOC, MDL_MSO_MDOC, PHOTO_ID_MSO_MDOC, EHIC_MSO_MDOC, PDA1_MSO_MDOC],
-  "dc+sd-jwt": [PID_SD_JWT_VC, EHIC_SD_JWT_VC, PDA1_SD_JWT_VC, EHIC_SD_JWT_VC_DC4EU, LEARNING_CREDENTIAL_SD_JWT_VC]
+  "mso_mdoc": [PID_MSO_MDOC, MDL_MSO_MDOC, PHOTO_ID_MSO_MDOC, EHIC_MSO_MDOC, PDA1_MSO_MDOC, ...getDynamicMsoMdocAttestation()],
+  "dc+sd-jwt": [PID_SD_JWT_VC, EHIC_SD_JWT_VC, PDA1_SD_JWT_VC, EHIC_SD_JWT_VC_DC4EU, LEARNING_CREDENTIAL_SD_JWT_VC, ...getDynamicSdJwtVcAttestation()]
 }
 
 export const getAttestationByFormatAndType =

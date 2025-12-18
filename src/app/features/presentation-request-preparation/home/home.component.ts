@@ -19,7 +19,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { AttestationSelection, AttributeSelectionMethod } from '@features/presentation-request-preparation/models/AttestationSelection';
 import { AttributeSelectionComponent } from '@features/presentation-request-preparation/components/attribute-selection/attribute-selection.component';
-import { TransactionInitializationRequest } from '@core/models/TransactionInitializationRequest';
+import { TransactionInitializationRequest, TransactionInitializationRequestState } from '@core/models/TransactionInitializationRequest';
 import { VerifierEndpointService } from '@core/services/verifier-endpoint.service';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -31,8 +31,9 @@ import { DCQLService } from '@app/core/services/dcql-service';
 import { Subject } from 'rxjs';
 import { SessionStorageService } from '@app/core/services/session-storage.service';
 import { ISSUER_CHAIN } from '@app/core/constants/general';
-import { AttestationFormat } from '@app/core/models/attestation/AttestationFormat';
 import { SUPPORTED_ATTESTATIONS } from '@app/core/constants/attestation-definitions';
+import { environment } from '@environments/environment';
+import { DEFAULT_SCHEME } from '@app/core/constants/general';
 
 @Component({
   imports: [
@@ -71,7 +72,6 @@ export class HomeComponent implements OnDestroy {
 
   requestUriMethodControl = new FormControl('get');
 
-
   private readonly _formBuilder = inject(FormBuilder);
   formGroup = this._formBuilder.group({
     selectAttestationCtrl: ['', Validators.required],
@@ -82,6 +82,7 @@ export class HomeComponent implements OnDestroy {
   selectedRequestUriMethod: 'get' | 'post' = 'get';
 
   initializationRequest: TransactionInitializationRequest | null = null;
+  initializationRequestState: TransactionInitializationRequestState | null = null;
 
   private readonly destroy$ = new Subject<void>();
 
@@ -106,7 +107,6 @@ export class HomeComponent implements OnDestroy {
         }
       });
     }
-    
   }
 
   handleAttributesCollectedEvent($event: AttributesSelectionEvent) {
@@ -118,6 +118,11 @@ export class HomeComponent implements OnDestroy {
         this.selectedAttributes,
         this.selectedRequestUriMethod
       );
+
+      this.initializationRequestState = {
+        scheme: this.getScheme(),
+        transactionInitializationRequest: this.initializationRequest,
+      };
     } else {
       this.selectedAttributes = null;
     }
@@ -132,8 +137,14 @@ export class HomeComponent implements OnDestroy {
         this.selectedAttributes,
         this.selectedRequestUriMethod
       );
+
+      this.initializationRequestState = {
+        scheme: this.getScheme(),
+        transactionInitializationRequest: this.initializationRequest,
+      };
     } else {
       this.initializationRequest = null;
+      this.initializationRequestState = null;
     }
   }
 
@@ -152,10 +163,28 @@ export class HomeComponent implements OnDestroy {
       issuerChain);
   }
 
+  private getScheme(): string {
+    let scheme = DEFAULT_SCHEME;
+    this.selectedAttestations!.forEach((attestation) => {
+
+      const envAttestation = environment.attestation.find((envAtt) => {
+        return envAtt.value === attestation.type;
+      });
+
+      if (envAttestation !== undefined && envAttestation.scheme !== undefined) {
+        scheme = envAttestation?.scheme;
+      }
+    });
+    return scheme!;
+  }
+
   proceedToInvokeWallet() {
-    if (this.initializationRequest != null) {
+    if (
+      this.initializationRequestState != null &&
+      this.initializationRequest != null
+    ) {
       this.verifierEndpointService.initializeTransaction(
-        this.initializationRequest,
+        this.initializationRequestState,
         (_) => {
           this.navigateService.navigateTo('invoke-wallet');
         }
@@ -166,21 +195,32 @@ export class HomeComponent implements OnDestroy {
   }
 
   attestationsSelected(): boolean {
-    return this.selectedAttestations !== null
-      && this.selectedAttestations
-      .filter((attestation) =>
-        attestation.format !== null && attestation.attributeSelectionMethod !== null
-      ).
-      length > 0;
+    return (
+      this.selectedAttestations !== null &&
+      this.selectedAttestations.filter(
+        (attestation) =>
+          attestation.format !== null &&
+          attestation.attributeSelectionMethod !== null
+      ).length > 0
+    );
   }
 
   attributesSelected(): boolean {
-    return this.selectedAttestations !== null
-    && this.selectedAttestations.filter((attestation) => {
-      if(attestation.attributeSelectionMethod === AttributeSelectionMethod.SELECTABLE) {
-        return this.selectedAttributes?.[attestation.type]?.length?? 0 > 0;
-      } else return attestation.attributeSelectionMethod === AttributeSelectionMethod.ALL_ATTRIBUTES;
-    }).length === this.selectedAttestations.length;
+    return (
+      this.selectedAttestations !== null &&
+      this.selectedAttestations.filter((attestation) => {
+        if (
+          attestation.attributeSelectionMethod ===
+          AttributeSelectionMethod.SELECTABLE
+        ) {
+          return this.selectedAttributes?.[attestation.type]?.length ?? 0 > 0;
+        } else
+          return (
+            attestation.attributeSelectionMethod ===
+            AttributeSelectionMethod.ALL_ATTRIBUTES
+          );
+      }).length === this.selectedAttestations.length
+    );
   }
 
   canProceed() {

@@ -5,7 +5,7 @@ import {HttpService} from '@network/http/http.service';
 import {LocalStorageService} from './local-storage.service';
 import * as constants from '@core/constants/general';
 import {DeviceDetectorService} from './device-detector.service';
-import {TransactionInitializationRequest} from "@core/models/TransactionInitializationRequest";
+import {TransactionInitializationRequestState} from "@core/models/TransactionInitializationRequest";
 import {InitializedTransaction} from "@core/models/InitializedTransaction";
 import {WalletResponse} from "@core/models/WalletResponse";
 import {EventLog} from "@core/models/EventLog";
@@ -19,7 +19,6 @@ const VALIDATE_SD_JWT_VC_PRESENTATION_ENDPOINT = 'utilities/process/sdJwtVc';
 
 @Injectable()
 export class VerifierEndpointService {
-
   constructor(
     private readonly httpService: HttpService,
     private readonly localStorageService: LocalStorageService,
@@ -28,9 +27,9 @@ export class VerifierEndpointService {
   ) {
   }
 
-  initializeTransaction(initializationRequest: TransactionInitializationRequest, callback: (value: InitializedTransaction) => void) {
-    if (initializationRequest) {
-      const payload: any = {...initializationRequest};
+  initializeTransaction(initializationRequestState: TransactionInitializationRequestState, callback: (value: InitializedTransaction) => void) {
+    if (initializationRequestState) {
+      const payload: any = {...initializationRequestState.transactionInitializationRequest};
       if (!this.deviceDetectorService.isDesktop()) {
         payload['wallet_response_redirect_uri_template'] = location.origin + SAME_DEVICE_UI_RE_ENTRY_URL;
       }
@@ -39,7 +38,7 @@ export class VerifierEndpointService {
           tap((res) => {
             let activeTransaction : ActiveTransaction = {
               initialized_transaction: res,
-              initialization_request: initializationRequest
+              initialization_request_state: initializationRequestState,
             }
             this.localStorageService.set(constants.ACTIVE_TRANSACTION, JSON.stringify(activeTransaction));
           })

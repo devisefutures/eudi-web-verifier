@@ -20,6 +20,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import {MatProgressBarModule} from '@angular/material/progress-bar';
+import {
+  InitializedTransactionByReference,
+  InitializedTransactionByValue,
+} from '@app/core/models/InitializedTransaction';
 
 @Component({
     selector: 'vc-qr-code',
@@ -69,12 +73,6 @@ export class QrCodeComponent implements OnInit, OnDestroy {
     this.localStorageService = this.injector.get(LocalStorageService);
     this.dialog = this.injector.get(MatDialog);
     this.isCrossDevice = this.deviceDetectorService.isDesktop();
-
-    if (this.localStorageService.get(constants.SCHEME)) {
-      this.scheme = this.localStorageService.get(constants.SCHEME) ?? constants.DEFAULT_SCHEME;
-    } else {
-      this.scheme = constants.DEFAULT_SCHEME;
-    }
   }
 
   ngOnInit(): void {
@@ -84,7 +82,34 @@ export class QrCodeComponent implements OnInit, OnDestroy {
     if (!this.transaction) {
       this.navigateService.goHome();
     } else {
-      this.deepLinkTxt = this.buildQrCode(this.transaction.initialized_transaction);
+      if (this.localStorageService.get(constants.SCHEME)) {
+        this.scheme =
+          this.localStorageService.get(constants.SCHEME) ??
+          this.transaction.initialization_request_state.scheme;
+      } else {
+        this.scheme = this.transaction.initialization_request_state.scheme;
+      }
+
+      if (
+        this.transaction.initialization_request_state
+          .transactionInitializationRequest.jar_mode === 'by_value'
+      ) {
+        this.deepLinkTxt = this.buildQrCode_by_value(
+          (
+            this.transaction
+              .initialized_transaction as InitializedTransactionByValue
+          ).request
+        );
+      } else if (
+        this.transaction.initialization_request_state
+          .transactionInitializationRequest.jar_mode === 'by_reference'
+      ) {
+        this.deepLinkTxt = this.buildQrCode_by_reference(
+          this.transaction
+            .initialized_transaction as InitializedTransactionByReference
+        );
+      }
+
       if (this.isCrossDevice) {
         this.pollingRequest(this.transaction.initialized_transaction.transaction_id);
       }
@@ -121,18 +146,63 @@ export class QrCodeComponent implements OnInit, OnDestroy {
   private concludeTransaction(response: WalletResponse): ConcludedTransaction {
     let concludedTransaction = {
       transactionId: this.transaction.initialized_transaction.transaction_id,
-      presentationQuery: this.transaction.initialization_request!!.dcql_query,
+      presentationQuery:
+        this.transaction.initialization_request_state
+          .transactionInitializationRequest!!.dcql_query,
       walletResponse: response,
-      nonce: this.transaction.initialization_request.nonce
-    }
+      nonce:
+        this.transaction.initialization_request_state
+          .transactionInitializationRequest.nonce,
+    };
     // Clear local storage
     this.localStorageService.remove(constants.ACTIVE_TRANSACTION);
 
     return concludedTransaction;
   }
 
-  private buildQrCode(data: { client_id: string, request_uri: string, request_uri_method: 'get' | 'post', transaction_id: string }): string {
-    return `${this.scheme}?client_id=${encodeURIComponent(data.client_id)}&request_uri=${encodeURIComponent(data.request_uri)}&request_uri_method=${encodeURIComponent(data.request_uri_method)}`;
+  private buildQrCode_by_reference(data: {
+    client_id: string;
+    request_uri: string;
+    request_uri_method: 'get' | 'post';
+    transaction_id: string;
+  }): string {
+    return `${this.scheme}?client_id=${encodeURIComponent(
+      data.client_id
+    )}&request_uri=${encodeURIComponent(
+      data.request_uri
+    )}&request_uri_method=${encodeURIComponent(data.request_uri_method)}`;
+  }
+
+  private buildQrCode_by_value(token: string): string {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Token does not have the expected 3 parts');
+    }
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    const parsed = JSON.parse(jsonPayload);
+
+    const request_new = `${this.scheme}?response_type=${
+      parsed.response_type
+    }&response_mode=${
+      parsed.response_mode
+    }&client_id=redirect_uri${encodeURIComponent(
+      ':' + parsed.response_uri
+    )}&response_uri=${encodeURIComponent(
+      parsed.response_uri
+    )}&dcql_query=${encodeURIComponent(
+      JSON.stringify(parsed.dcql_query)
+    )}&nonce=${parsed.nonce}&state=${parsed.state}`;
+
+    return request_new;
   }
 
   openLogs() {

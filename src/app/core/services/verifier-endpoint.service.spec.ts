@@ -3,8 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { VerifierEndpointService } from './verifier-endpoint.service';
 import { HttpService } from '@network/http/http.service';
 import { InitializedTransaction } from '../models/InitializedTransaction';
-import { TransactionInitializationRequest } from '../models/TransactionInitializationRequest';
 import { of } from 'rxjs';
+import { TransactionInitializationRequestState } from '../models/TransactionInitializationRequest';
 
 const mockResponseData: InitializedTransaction = {
   client_id: 'client_id',
@@ -34,8 +34,7 @@ describe('VerifierEndpointService', () => {
 
   it('should initialize transaction', () => {
     httpServiceSpy.post.and.returnValue(of(mockResponseData));
-    service.initializeTransaction({} as TransactionInitializationRequest, () => {});
+    service.initializeTransaction({} as TransactionInitializationRequestState, () => {});
     expect(httpServiceSpy.post).toHaveBeenCalled();
   });
-
 });

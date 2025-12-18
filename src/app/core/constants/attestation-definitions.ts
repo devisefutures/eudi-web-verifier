@@ -1,5 +1,6 @@
 import {AttestationDefinition} from "@core/models/attestation/AttestationDefinition";
 import {AttestationType} from "@core/models/attestation/AttestationType";
+import { environment } from "@environments/environment";
 
 export const PID_ATTESTATION: AttestationDefinition = {
   name: "Person Identification Data (PID)",
@@ -182,4 +183,25 @@ export const SUPPORTED_ATTESTATIONS: { [id: string]: AttestationDefinition } = {
   "ehic-dc4eu": EHIC_ATTESTATION_DC4EU,
   "pda1": PDA1_ATTESTATION,
   "learning_credential": LEARNING_CREDENTIAL_ATTESTATION,
+  ...getDynamicAttestations(),
+};
+
+export function getDynamicAttestations(): {
+  [id: string]: AttestationDefinition;
+} {
+  const map: { [id: string]: AttestationDefinition } = {};
+
+  for (const attestationDef of environment.attestation) {
+    const NEW_ATTESTATION: AttestationDefinition = {
+      name: attestationDef.name,
+      type:
+        AttestationType[attestationDef.key as keyof typeof AttestationType] ||
+        attestationDef.key,
+      dataSet: attestationDef.dataSet,
+    };
+
+    map[attestationDef.value] = NEW_ATTESTATION;
+  }
+
+  return map;
 }

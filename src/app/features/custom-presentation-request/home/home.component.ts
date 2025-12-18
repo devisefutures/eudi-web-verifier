@@ -7,7 +7,7 @@ import {BodyAction} from '@shared/elements/body-actions/models/BodyAction';
 import {PRESENTATION_ACTIONS} from '@core/constants/pages-actions';
 import {ActionCode} from '@shared/elements/body-actions/models/ActionCode';
 import {VerifierEndpointService} from "@core/services/verifier-endpoint.service";
-import {TransactionInitializationRequest} from "@core/models/TransactionInitializationRequest";
+import {TransactionInitializationRequest, TransactionInitializationRequestState} from "@core/models/TransactionInitializationRequest";
 import { DataService } from '@app/core/services/data-service';
 
 @Component({
@@ -18,7 +18,6 @@ import { DataService } from '@app/core/services/data-service';
     standalone: false
 })
 export class HomeComponent implements OnInit, OnDestroy {
-
   destroy$ = new Subject();
   actions: BodyAction[] = PRESENTATION_ACTIONS;
   requestCode = '';
@@ -67,7 +66,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   initializePresentationTransaction() {
     if (this.requestCode) {
-      let request = JSON.parse(this.requestCode) as TransactionInitializationRequest
+      let request = JSON.parse(this.requestCode) as TransactionInitializationRequestState;
       this.verifierEndpointService.initializeTransaction(request, (_) => {
         this.hideNextStep();
         this.navigateService.navigateTo('/custom-request/invoke');
